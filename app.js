@@ -52,6 +52,85 @@ app.get('/', (req, res) => {
 		res.write(error);
 		res.end();
 	});
+}).get('/update/:name', (req, res) => {
+	let newValues = {$set: 
+		{address: "92210 Saint Cloud", 
+			tel:["0141129403","0686801769"],
+			mail:["philippe.ragout@free.fr","philippe.ragout@gmail.com"]
+		}
+	};
+	res.statusCode = 200;
+	res.setHeader("Content-Type", "application/json");
+	update("customers", {name:{$regex:"^"+req.params.name,$options:"$i"}}, newValues).then((response) => {
+		res.write(JSON.stringify(response));
+		console.log(response.result.n, "document updated");
+		res.end();
+	}).catch((error) => {
+		res.write(error);
+		res.end();
+	});
+}).get('/delete/:name', (req, res) => {
+	res.statusCode = 200;
+	res.setHeader("Content-Type", "application/json");
+	del("customers", {name:{$regex:"^"+req.params.name,$options:"$i"}}).then((response) => {
+		res.write(JSON.stringify(response));
+		console.log(response.result.n, "document deleted");
+		res.end();
+	}).catch((error) => {
+		res.write(error);
+		res.end();
+	});
+}).get('/drop/:collection', (req, res) => {
+	res.statusCode = 200;
+	res.setHeader("Content-Type", "application/json");
+	drop(req.params.collection).then((response) => {
+		res.write(response);
+		console.log(req.params.collection, "deleted");
+		res.end();
+	}).catch((error) => {
+		res.write(error);
+		res.end();
+	});
+}).get('/find/:name', (req, res) => {
+	res.statusCode = 200;
+	res.setHeader("Content-Type", "application/json");
+	find("customers", {name:{$regex:"^"+req.params.name,$options:"$i"}}).then((response) => {
+		res.write(response);
+		res.end();
+	}).catch((error) => {
+		res.write(error);
+		res.end();
+	});
+}).get('/sort/:collection/-1', (req, res) => {
+	res.statusCode = 200;
+	res.setHeader("Content-Type", "application/json");
+	sort(req.params.collection, {}, {name: -1}).then((response) => {
+		res.write(response);
+		res.end();
+	}).catch((error) => {
+		res.write(error);
+		res.end();
+	});
+}).get('/sort/:collection/1', (req, res) => {
+	res.statusCode = 200;
+	res.setHeader("Content-Type", "application/json");
+	sort(req.params.collection, {}, {name: 1}).then((response) => {
+		res.write(response);
+		res.end();
+	}).catch((error) => {
+		res.write(error);
+		res.end();
+	});
+}).get('/join', (req, res) => {
+	res.statusCode = 200;
+	res.setHeader("Content-Type", "application/json");
+	join().then((response) => {
+		res.write(response);
+		res.end();
+	}).catch((error) => {
+		res.write(error);
+		res.end();
+	});
 }).use((req, res, next) => {
 	res.redirect('/');
 });
@@ -71,5 +150,102 @@ function insert(collection, data) {
 		mdb.insert(collection, data)
 		.then(result => {resolve(result)})
 		.catch(error => {reject(JSON.stringify(error))});
+	});
+}
+
+/*
+ *========================================================
+ * Update Document(s)
+ *========================================================
+ */
+function update(collection, query, data) {
+	return new Promise((resolve, reject) =>  {
+		let mdb = new MongoDB(dbName, mdbUrl);
+		mdb.update(collection, query, data)
+		.then(result => {resolve(result)})
+		.catch(error => {reject(JSON.stringify(error))});
+	});
+}
+
+/*
+ *========================================================
+ * Delete Document(s)
+ *========================================================
+ */
+function del(collection, query) {
+	return new Promise((resolve, reject) =>  {
+		let mdb = new MongoDB(dbName, mdbUrl);
+		mdb.del(collection, query)
+		.then(result => {resolve(result)})
+		.catch(error => {reject(JSON.stringify(error))});
+	});
+}
+
+/*
+ *========================================================
+ * Drop collection
+ *========================================================
+ */
+function drop(collection) {
+	return new Promise((resolve, reject) =>  {
+		let mdb = new MongoDB(dbName, mdbUrl);
+		mdb.drop(collection)
+		.then(result => {resolve(JSON.stringify(result))})
+		.catch(error => {reject(JSON.stringify(error))});
+	});
+}
+
+/*
+ *========================================================
+ * Find
+ *========================================================
+ */
+function find(collection, query) {
+	return new Promise((resolve, reject) =>  {
+		let mdb = new MongoDB(dbName, mdbUrl);
+		mdb.find(collection, query, {projection: {_id:0}})
+		.then(result => {resolve(JSON.stringify(result))})
+		.catch(error => {reject(JSON.stringify(error))});
+	});
+}
+
+/*
+ *========================================================
+ * Sort the Result
+ *========================================================
+ */
+function sort(collection, query, sort) {
+	return new Promise((resolve, reject) =>  {
+		let mdb = new MongoDB(dbName, mdbUrl);
+		mdb.findSort(collection, query, {projection: {_id:0}}, sort)
+		.then(result => {resolve(JSON.stringify(result))})
+		.catch(error => {reject(JSON.stringify(error))});
+	});
+}
+
+/*
+ *========================================================
+ * Join Collections
+ *========================================================
+ */
+function join() {
+	return new Promise((resolve, reject) =>  {
+		let mdb = new MongoDB(dbName, mdbUrl);
+		mdb.connect().then(db => {
+			db.collection('customers').aggregate([
+			{$lookup:
+				{
+					from: 'products',			// collection to join
+					localField: 'product_id',	// field from the input documents
+					foreignField: '_id',		// field from the documents of the "from" collection
+					as: 'orderdetails'			// output array field
+				}
+			}
+		    ]).toArray(function(err, res) {
+				if (err) reject(JSON.stringify(err));
+				resolve(JSON.stringify(res));
+				mdb.client.close();
+			});
+		});
 	});
 }
